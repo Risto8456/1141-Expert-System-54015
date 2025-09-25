@@ -1,0 +1,47 @@
+(deftemplate fire (slot type))
+(deftemplate burning-object (slot material))
+(defrule fire-type-A-1
+    (burning-object (material paper))
+    =>
+    (assert (fire (type A))))
+(defrule fire-type-A-2
+    (burning-object (material wood))
+    =>
+    (assert (fire (type A))))
+(defrule fire-type-A-3
+    (burning-object (material cloth))
+    =>
+    (assert (fire (type A))))
+(defrule fire-type-B-1
+    (burning-object (material oil))
+    =>
+    (assert (fire (type B))))
+(defrule fire-type-B-2
+    (burning-object (material gas))
+    =>
+    (assert (fire (type B))))
+(defrule fire-type-C-1
+    (burning-object (material battery))
+    =>
+    (assert (fire (type C))))
+(defrule fire-type-D-1
+    (burning-object (material chemicals))
+    =>
+    (assert (fire (type D))))
+
+(defrule deal-with-type-A
+    (fire (type A))
+    =>
+    (printout t "general extinguisher or water" crlf))
+(defrule deal-with-type-B
+    (fire (type B))
+    =>
+    (printout t "foam extinguisher or carbon dioxide extinguisher" crlf))
+(defrule deal-with-type-C
+    (fire (type C))
+    =>
+    (printout t "dry chemicals extinguisher or carbon dioxide extinguisher" crlf))
+(defrule deal-with-type-D
+    (fire (type D))
+    =>
+    (printout t "graphitized coke" crlf))
