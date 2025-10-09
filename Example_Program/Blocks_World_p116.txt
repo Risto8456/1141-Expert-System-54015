@@ -1,0 +1,64 @@
+(deftemplate on-top-of (slot upper) (slot lower))
+(deftemplate goal (slot move) (slot on-top-of))
+
+(deffacts initial-state
+    (block A)
+    (block B)
+    (block C)
+    (block D)
+    (block E)
+    (block F)
+    (on-top-of (upper nothing) (lower A))
+    (on-top-of (upper A) (lower B))
+    (on-top-of (upper B) (lower C))
+    (on-top-of (upper C) (lower floor))
+    (on-top-of (upper nothing) (lower D))
+    (on-top-of (upper D) (lower E))
+    (on-top-of (upper E) (lower F))
+    (on-top-of (upper F) (lower floor))
+    (goal (move C) (on-top-of E))
+)
+
+(defrule move-directly
+    ?goal <- (goal (move ?b1) (on-top-of ?b2))
+    (block ?b1)
+    (block ?b2)
+    (on-top-of (upper nothing) (lower ?b1))
+    ?stack1 <- (on-top-of (upper nothing) (lower ?b2))
+    ?stack2 <- (on-top-of (upper ?b1) (lower ?b3))
+    =>
+    (retract ?goal ?stack1 ?stack2)
+    (assert (on-top-of (upper ?b1) (lower ?b2)))
+    (assert (on-top-of (upper nothing) (lower ?b3)))
+    (printout t ?b1 " move on top of " ?b2 "." crlf)
+)
+
+(defrule move-to-floor
+    ?goal <- (goal (move ?b1) (on-top-of floor))
+    (block ?b1)
+    (on-top-of (upper nothing) (lower ?b1))
+    ?stack <- (on-top-of (upper ?b1) (lower ?b2))
+    =>
+    (retract ?goal ?stack)
+    (assert (on-top-of (upper ?b1) (lower floor)))
+    (assert (on-top-of (upper nothing) (lower ?b2)))
+    (printout t ?b1 " move on top of floor." crlf)
+)
+
+(defrule clear-move-block
+    (goal (move ?b1) (on-top-of ?))
+    (block ?b1)
+    (block ?b2)
+    (on-top-of (upper ?b2) (lower ?b1))
+    =>
+    (assert (goal (move ?b2) (on-top-of floor)))
+)
+
+(defrule clear-place-block
+    (goal (move ?) (on-top-of ?b1))
+    (block ?b1)
+    (block ?b2)
+    (on-top-of (upper ?b2) (lower ?b1))
+    =>
+    (assert (goal (move ?b2) (on-top-of floor)))
+)

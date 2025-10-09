@@ -1,0 +1,40 @@
+;; test input : red green blue
+(deftemplate permutation (multislot values) (multislot rest))
+
+(deffacts initial (total 0))
+
+(defrule read-base-fact
+    (declare (salience 100))
+    =>
+    (printout t "Please input a base fact for the permutation ... ")
+    (bind ?input (explode$ (readline)))
+    (assert (permutation (values) (rest ?input)))
+)
+
+;; 遞迴：只在 rest 至少有一個元素時觸發
+(defrule recursion
+    (permutation (values $?val) (rest $?top ?a $?down))
+    =>
+    (assert (permutation (values $?val ?a) (rest $?top $?down)))
+    ;;(printout t "values : " $?val ?a crlf)
+)
+
+;; 輸出「rest 為空」的葉節點
+(defrule print_permutation
+    (declare (salience -100))
+    ?pmt <- (permutation (values $?val) (rest)) ;; 當 rest 完全為空才會觸發
+    ?tad <- (total ?T)
+    =>
+    (retract ?tad ?pmt)
+    (assert (total (+ ?T 1)))
+    (printout t "Permutation is " $?val crlf)
+)
+
+;; 等所有 permutation 都處理完才印總數
+(defrule print_total
+    (declare (salience -200))
+    ?tad <- (total ?T)
+    =>
+    (retract ?tad)
+    (printout t "The total number is " ?T crlf)
+)
