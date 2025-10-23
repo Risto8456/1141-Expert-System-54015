@@ -1,0 +1,28 @@
+(deftemplate data (multislot numbers))
+
+(defrule read-data
+    (declare (salience 100))
+    =>
+    (printout t "Data sorting: ")
+    (bind ?input (explode$ (readline)))
+    (assert (data (numbers ?input)))
+    (open "sort.txt" out "w")
+)
+
+(defrule swap
+    ?ptr <- (data (numbers $?top ?x ?y $?down))
+    (test (> ?x ?y))
+    =>
+    (retract ?ptr)
+    (assert (data (numbers $?top ?y ?x $?down)))
+    ;; (printout out "swap : " ?x ", " ?y crlf)
+)
+
+(defrule end
+    (declare (salience -100))
+    ?ptr <- (data (numbers $?sorted))
+    =>
+    (retract ?ptr)
+    (printout out "The result is " $?sorted crlf)
+    (close out)
+)
