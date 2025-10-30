@@ -1,0 +1,96 @@
+(deftemplate sort (slot super) (slot sub))
+(deftemplate relationship (multislot sort01) (multislot sort02))
+
+(deffacts initial (phase input))
+
+(defrule input
+    (phase input)
+    =>
+    (printout t "Enter sort #1: ")
+    (bind ?input1 (read))
+    (printout t "Enter sort #2: ")
+    (bind ?input2 (read))
+    (assert (relationship (sort01 ?input1) (sort02 ?input2)))
+    (load-facts "animal.txt")
+)
+
+(defrule input_error
+    ?f1 <- (phase input)
+    ?r1 <- (relationship (sort01 ?s1) (sort02 ?s2))
+    (or (and (not (sort (super ?s1) (sub ?))) 
+             (not (sort (super ?) (sub ?s1))))
+        (and (not (sort (super ?s2) (sub ?)))
+             (not (sort (super ?) (sub ?s2)))))
+    =>
+    (retract ?f1 ?r1)
+    (assert (phase input))
+    (printout t "Input error. Please input again." crlf)
+)
+
+(defrule change_phase_add_parent
+    (declare (salience -10))
+    ?f1 <- (phase input)
+    =>
+    (retract ?f1)
+    (assert (phase add_parent))
+)
+
+(defrule add_sort01_parent
+    ?f1 <- (phase add_parent)
+    ?r1 <- (relationship (sort01 ?top $?other) (sort02 $?s2))
+    (sort (super ?parent) (sub ?top))
+    =>
+    (retract ?f1 ?r1)
+    (assert (phase add_parent))
+    (assert (relationship (sort01 ?parent ?top $?other) (sort02 $?s2)))
+)
+
+(defrule add_sort02_parent
+    ?f1 <- (phase add_parent)
+    ?r1 <- (relationship (sort01 $?s1) (sort02 ?top $?other))
+    (sort (super ?parent) (sub ?top))
+    =>
+    (retract ?f1 ?r1)
+    (assert (phase add_parent))
+    (assert (relationship (sort01 $?s1) (sort02 ?parent ?top $?other)))
+)
+
+(defrule change_phase_delete_same_parent
+    (declare (salience -10))
+    ?f1 <- (phase add_parent)
+    =>
+    (retract ?f1)
+    (assert (phase delete_same_parent))
+)
+
+(defrule delete_same_parent
+    ?f1 <- (phase delete_same_parent)
+    ?r1 <- (relationship (sort01 ?top1 $?other1) (sort02 ?top2 $?other2))
+    (test (eq ?top1 ?top2))
+    =>
+    (retract ?f1 ?r1)
+    (assert (phase delete_same_parent))
+    (assert (relationship (sort01 $?other1) (sort02 $?other2)))
+)
+
+(defrule change_phase_finish
+    (declare (salience -10))
+    ?f1 <- (phase delete_same_parent)
+    =>
+    (retract ?f1)
+    (assert (phase finish))
+)
+
+(defrule finish
+    ?f1 <- (phase finish)
+    ?r1 <- (relationship (sort01 $?s1) (sort02 $?s2))
+    =>
+    (retract ?f1 ?r1)
+    (printout t "The relationship distance is " (+ (length$ $?s1) (length$ $?s2)) crlf)
+)
+
+;; (defrule dubug
+;;     (relationship (sort01 $?s1) (sort02 $?s2))
+;;     =>
+;;     (printout t "relationship : " $?s1 ", " $?s2 crlf)
+;; )
