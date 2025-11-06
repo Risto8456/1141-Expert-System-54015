@@ -1,0 +1,114 @@
+(deftemplate sales (slot id) (multislot items))
+(deftemplate same (multislot pair) (multislot items))
+(deftemplate recommend (slot id) (multislot similar) (multislot items))
+
+(deffacts initial (phase load-data))
+
+(defrule assert-data
+    (phase load-data)
+    =>
+    (load-facts "record-02.txt") ;; 選擇讀入檔案
+    (open "recommend.txt" out "w")
+)
+
+(defrule generate-recommend
+    (phase load-data)
+    (sales (id ?id1) (items $?))
+    =>
+    (assert (recommend (id ?id1) (similar) (items)))
+)
+
+(defrule generate-pair
+    (phase load-data)
+    (sales (id ?id1) (items $?))
+    (sales (id ?id2&~?id1) (items $?))
+    =>
+    (assert (same (pair ?id1 ?id2) (items)))
+)
+
+(defrule generate-same-items
+    (phase load-data)
+    ?f <- (same (pair ?id1 ?id2) (items $?items))
+    (sales (id ?id1) (items $? ?x $?))
+    (sales (id ?id2) (items $? ?x $?))
+    (test (not (member$ ?x $?items)))
+    =>
+    (modify ?f (items $?items ?x))
+)
+
+(defrule change-phase-1
+    (declare (salience -10))
+    ?f <- (phase load-data)
+    =>
+    (retract ?f)
+    (assert (phase find-similar))
+)
+
+(defrule first-similar
+    (phase find-similar)
+    ?f <- (recommend (id ?id1) (similar) (items))
+    (or (same (pair ?id1 ?id2) (items $?cur_items))
+        (same (pair ?id2 ?id1) (items $?cur_items)))
+    =>
+    (modify ?f (similar ?id2))
+)
+
+(defrule more-similar
+    (phase find-similar)
+    ?f <- (recommend (id ?id1) (similar ?top $?other) (items))
+    (or (same (pair ?id1 ?top) (items $?ori_items))
+        (same (pair ?top ?id1) (items $?ori_items)))
+    (or (same (pair ?id1 ?id2) (items $?cur_items))
+        (same (pair ?id2 ?id1) (items $?cur_items)))
+    (test (not (member$ ?id2 $?other)))
+    (test (neq ?id2 ?top))
+    (test (> (length$ $?cur_items) (length$ $?ori_items)))
+    =>
+    (modify ?f (similar $?id2))
+)
+
+(defrule equal-similar
+    (phase find-similar)
+    ?f <- (recommend (id ?id1) (similar ?top $?other) (items))
+    (or (same (pair ?id1 ?top) (items $?ori_items))
+        (same (pair ?top ?id1) (items $?ori_items)))
+    (or (same (pair ?id1 ?id2) (items $?cur_items))
+        (same (pair ?id2 ?id1) (items $?cur_items)))
+    (test (not (member$ ?id2 $?other)))
+    (test (neq ?id2 ?top))
+    (test (eq (length$ $?cur_items) (length$ $?ori_items)))
+    =>
+    (modify ?f (similar ?top $?other ?id2))
+)
+
+(defrule change-phase-2
+    (declare (salience -10))
+    ?f <- (phase find-similar)
+    =>
+    (retract ?f)
+    (assert (phase generate-recommend-items))
+)
+
+(defrule generate-recommend-items
+    ?f <- (recommend (id ?id1) (similar $? ?id2 $?) (items $?recommend-items))
+    (sales (id ?id1) (items $?items1))
+    (sales (id ?id2) (items $? ?item2 $?))
+    (test (not (member$ ?item2 $?items1)))
+    (test (not (member$ ?item2 $?recommend-items)))
+    =>
+    (modify ?f (items $?recommend-items ?item2))
+)
+
+(defrule output-result
+    (declare (salience -20))
+    ?f <- (recommend (id ?id1) (similar $?similar) (items $?items))
+    =>
+    (retract ?f)
+    (printout out ?id1 $?similar ":" $?items crlf)
+)
+
+(defrule finish
+    (declare (salience -30))
+    =>
+    (close out)
+)
