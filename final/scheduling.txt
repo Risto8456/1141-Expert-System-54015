@@ -1,0 +1,53 @@
+(deftemplate teacher (slot ID) (slot weight))
+(deftemplate class (slot ID))
+(deftemplate classroom (slot ID) (slot type))
+(deftemplate lesson (slot ID) (slot state) (slot class) (slot teacher) (slot type) (multislot time) (multislot room)) 
+(deftemplate favorite-time (slot teacher) (multislot time))
+(deftemplate refuse-time (slot teacher) (multislot time))
+
+(deffacts initial
+  (alltime 101 102 103 104 105 106 107 108 109 110 
+	   201 202 203 204 205 206 207 208 209 210
+	   301 302 303 304 305 306 307 308 309 310
+	   401 402 403 404 405 406 407 408 409 410
+	   501 502 503 504 505 506 507 508 509 510)
+)
+
+;以下的規則會讀取data.txt內的教師、課程、班級、教室、喜好時間、拒絕時間等事實，並assert fact
+
+(defrule assert-data
+	(declare (salience 10000))
+	=>
+	(load-facts "data.txt"))
+
+;以下的片段排課規則供參考用, 非唯一方法
+
+(defrule select-lesson
+	?p <- (phase get-lesson)
+	(not (select ?))
+	(teacher (ID ?teacher) (weight ?weight))
+	(lesson (ID ?lesson) (state 0) (teacher ?teacher))
+	(not (and (teacher (ID ?else) (weight ?w2&:(< ?w2 ?weight)))
+             	  (lesson (state 0) (teacher ?else))))
+	=>
+        (retract ?p)
+	(assert (select ?lesson))
+        (assert (phase schedule-3)))
+
+(defrule schedule-3-favorite-time
+        ?p <- (phase schedule-3)
+        ?f1 <- (select ?select)
+        ?f2 <- (lesson (ID ?select) (state 0) (class ?class) (teacher ?teacher) (type ?type) (time) (room))
+        ?f3 <- (teacher (ID ?teacher) (weight ?weight))
+        (favorite-time (teacher ?teacher) (time $? ?t1 ?t2 ?t3&:(= (+ ?t1 2) ?t3) $?))
+        (refuse-time (teacher ?teacher) (time $?r-t))
+        (test (not (or (member$ ?t1 $?r-t) (member$ ?t2 $?r-t) (member$ ?t3 $?r-t))))
+        (classroom (ID ?classroom) (type ?type))
+        (not (lesson (teacher ?teacher) (time $? ?t1|?t2|?t3 $?)))
+        (not (lesson (class ?class) (time $? ?t1|?t2|?t3 $?)))
+        (not (lesson (time $? ?t1|?t2|?t3 $?) (room ?classroom ?classroom ?classroom)))
+        =>
+        (retract ?p ?f1)
+        (assert (phase get-lesson))
+        (modify ?f3 (weight (+ ?weight 3)))
+        (modify ?f2 (state 1) (time ?t1 ?t2 ?t3) (room ?classroom ?classroom ?classroom)))
