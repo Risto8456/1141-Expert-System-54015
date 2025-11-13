@@ -1,3 +1,6 @@
+(deftemplate edge (slot v1) (slot v2) (slot distance))
+(deftemplate shortest (slot v1) (slot v2) (slot distance))
+(deftemplate path (slot v1) (slot v2) (slot distance) (slot left) (multislot route))
 (deffacts initial
   (vertex A)
   (vertex B)
@@ -27,4 +30,81 @@
   (edge (v1 G) (v2 J) (distance 2))
   (edge (v1 H) (v2 I) (distance 25))
   (edge (v1 I) (v2 J) (distance 10))
+)
+
+;; 使用者輸入
+(defrule input-vextex
+  (declare (salience 100))
+  =>
+  (printout t "Start Vertex: ")
+  (assert (start (read)))
+  (printout t "End Vertex: ")
+  (assert (end (read)))
+)
+
+;; 產生反向邊
+(defrule generate-anti-direction-edge
+  (declare (salience 90))
+  (edge (v1 ?v1) (v2 ?v2) (distance ?d))
+  (not (edge (v1 ?v2) (v2 ?v1) (distance ?d)))
+  =>
+  (assert (edge (v1 ?v2) (v2 ?v1) (distance ?d)))
+  (assert (shortest (v1 ?v1) (v2 ?v2) (distance ?d)))
+  (assert (shortest (v1 ?v2) (v2 ?v1) (distance ?d)))
+)
+
+;; 產生無連接邊(無窮大)
+(defrule generate-disconnected-distance
+  (declare (salience 80))
+  (vertex ?v1)
+  (vertex ?v2&~?v1)
+  (not (edge (v1 ?v1) (v2 ?v2) (distance ?)))
+  =>
+  (assert (shortest (v1 ?v1) (v2 ?v2) (distance 1000)))
+)
+
+;; 產生任兩點間最短路徑長
+(defrule generate-shortest
+  (declare (salience 70))
+  (vertex ?i)
+  (vertex ?j&~?i)
+  (vertex ?k&~?i&~?j)
+  ?f <- (shortest (v1 ?i) (v2 ?j) (distance ?ori))
+  (shortest (v1 ?i) (v2 ?k) (distance ?new1))
+  (shortest (v1 ?k) (v2 ?j) (distance ?new2))
+  (test (< (+ ?new1 ?new2) ?ori))
+  =>
+  (modify ?f (distance (+ ?new1 ?new2)))
+)
+
+;; 產生起點至終點路徑模板
+(defrule generate-path
+  (declare (salience 60))
+  (start ?s)
+  (end ?e)
+  (shortest (v1 ?s) (v2 ?e) (distance ?d))
+  =>
+  (assert (path (v1 ?s) (v2 ?e) (distance ?d) (left ?d) (route ?s)))
+  (printout t ?d crlf)
+)
+
+;; 產生起點至終點最短路徑
+(defrule generate-shortest-route
+  (declare (salience 50))
+  ?f <- (path (v1 ?s) (v2 ?e) (distance ?dis) (left ?left) (route $?route))
+  (edge (v1 ?s) (v2 ?k&~?s&~?e) (distance ?d1))
+  (shortest (v1 ?k) (v2 ?e) (distance ?d2))
+  (test (eq (+ ?d1 ?d2) ?left))
+  =>
+  (retract ?f)
+  (assert (path (v1 ?k) (v2 ?e) (distance ?dis) (left (- ?left ?d1)) (route $?route ?k)))
+)
+
+;; 輸出
+(defrule output-result
+  (declare (salience 40))
+  ?f <- (path (v1 ?s) (v2 ?e) (distance ?dis) (left ?) (route $?route))
+  =>
+  (retract ?f)
+  (printout t "Distance: " ?dis " Route: (" (implode$ $?route) " " ?e ")" crlf)
 )
