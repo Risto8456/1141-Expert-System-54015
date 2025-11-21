@@ -1,0 +1,66 @@
+(deftemplate relative (slot parent) (multislot child))
+(deftemplate person (slot name) (slot gender) (slot alive) (slot after2013))
+(deftemplate inheritance (multislot priority))
+
+(defrule assert-data
+    (declare (salience 100))
+    =>
+    ;; 選擇讀入檔案
+    (load-facts "inheritance-1.txt")
+)
+
+;; 排序同輩(2013之前男優先於女)
+(defrule sort-peers
+    (declare (salience 90))
+    ?f <- (relative (parent ?p) (child $?top ?c1 ?c2 $?end))
+    (person (name ?c1) (gender F) (alive ?) (after2013 ?))
+    (person (name ?c2) (gender M) (alive ?) (after2013 no))
+    =>
+    (retract ?f)
+    (assert (relative (parent ?p) (child $?top ?c2 ?c1 $?end)))
+)
+
+;; 產生優先順序
+;; 國王與國王的同輩(兄弟姊妹)
+(defrule add-king-and-peers
+    (declare (salience 80))
+    (king-or-queen ?king)
+    ?r <- (relative (parent ?) (child $?p1 ?king $?p2))
+    =>
+    (retract ?r)
+    (assert (inheritance (priority ?king $?p1 $?p2)))
+)
+
+;; 放入對列成員之子女
+(defrule add-child
+    (declare (salience 70))
+    ?r <- (relative (parent ?p) (child $?c))
+    ?i <- (inheritance (priority $?top ?p $?end))
+    =>
+    (retract ?r ?i)
+    (assert (inheritance (priority $?top ?p $?c $?end)))
+)
+
+;; 篩掉國王或已死
+(defrule filter
+    (declare (salience 60))
+    ?i <- (inheritance (priority $?top ?p $?end))
+    (or (king-or-queen ?p)
+        (person (name ?p) (gender ?) (alive no) (after2013 ?))
+    )
+    =>
+    (retract ?i)
+    (assert (inheritance (priority $?top $?end)))
+)
+
+;; 輸出
+(defrule output
+    (declare (salience 50))
+    ?n <- (number ?num)
+    ?i <- (inheritance (priority ?top $?other))
+    =>
+    (retract ?i ?n)
+    (assert (inheritance (priority $?other)))
+    (assert (number (+ ?num 1)))
+    (printout t ?num " " ?top crlf)
+)
