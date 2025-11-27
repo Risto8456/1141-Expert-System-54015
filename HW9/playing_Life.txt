@@ -1,0 +1,137 @@
+;; MAIN
+(defmodule MAIN (export deftemplate ?ALL))
+    (deftemplate MAIN::cell (slot row) (slot column) (slot status)) (deftemplate MAIN::dimensions (slot rows) (slot columns))
+    
+    ;; 讀入檔案
+    (defrule MAIN::assert-data
+        =>
+        (load-facts "cell.txt")
+    )
+
+    (defrule MAIN::life-init
+        (last-generation ?l)
+        ?f <- (current-generation ?c&:(<= ?c ?l))
+        =>
+        (retract ?f)
+        (assert (current-generation (+ ?c 1)))
+        ;; 將其他 3 個 module 放入堆疊
+        (focus PRINT COMPUTE-NEIGHBORS NEXT-GENERATION)
+    )
+
+;; 1. 印出所有細胞
+(defmodule PRINT (import MAIN deftemplate ?ALL))
+    (defrule PRINT::start-print
+        (current-generation ?g)
+        =>
+        (assert (print-row 1))
+        (assert (print-column 1))
+        (printout t crlf "Generation " ?g crlf)
+    )
+    
+    (defrule PRINT::cell-print
+        (dimensions (rows ?nr) (columns ?nc))
+        ?f <- (print-column ?c&:(<= ?c ?nc))
+        (print-row ?r&:(<= ?r ?nr))
+        (cell (row ?r) (column ?c) (status ?s))
+        =>
+        (printout t ?s)
+        (retract ?f)
+        (assert (print-column (+ 1 ?c)))
+    )
+
+    (defrule PRINT::newline
+        (dimensions (rows ?) (columns ?nc))
+        ?f <- (print-column ?c&:(> ?c ?nc))
+        ?p <- (print-row ?r)
+        =>
+        (retract ?f ?p)
+        (assert (print-column 1))
+        (assert (print-row (+ 1 ?r)))
+        (printout t crlf)
+    )
+
+
+;; 2. 計算存活鄰居數
+(defmodule COMPUTE-NEIGHBORS (import MAIN deftemplate cell) 
+                             (export deftemplate neighbor-sum))
+    (deftemplate COMPUTE-NEIGHBORS::neighbor (slot row) (slot column) (multislot live-cell))
+    (deftemplate COMPUTE-NEIGHBORS::neighbor-sum (slot row) (slot column) (slot value))
+
+    (defrule COMPUTE-NEIGHBORS::make-neighbors
+        (cell (row ?x) (column ?y) (status *))
+        =>
+        ;; 上方 3 個
+        (assert (neighbor (row (- ?x 1)) (column (- ?y 1)) (live-cell ?x ?y)))
+        (assert (neighbor (row (- ?x 1)) (column ?y) (live-cell ?x ?y)))
+        (assert (neighbor (row (- ?x 1)) (column (+ ?y 1)) (live-cell ?x ?y)))
+        ;; 左右
+        (assert (neighbor (row ?x) (column (- ?y 1)) (live-cell ?x ?y)))
+        (assert (neighbor (row ?x) (column (+ ?y 1)) (live-cell ?x ?y)))
+        ;; 下方 3 個
+        (assert (neighbor (row (+ ?x 1)) (column (- ?y 1)) (live-cell ?x ?y)))
+        (assert (neighbor (row (+ ?x 1)) (column ?y) (live-cell ?x ?y)))
+        (assert (neighbor (row (+ ?x 1)) (column (+ ?y 1)) (live-cell ?x ?y)))
+    )
+
+    ;; 刪除出界
+    (defrule COMPUTE-NEIGHBORS::cleanup-neighbors
+        ?f1 <- (neighbor (row ?x) (column ?y) (live-cell $?))
+        (not (cell (row ?x) (column ?y) (status ?)))
+        =>
+        (retract ?f1)
+    )
+
+    (defrule COMPUTE-NEIGHBORS::create-neighbor-sum
+        (cell (row ?x) (column ?y) (status ?))
+        =>
+        (assert (neighbor-sum (row ?x) (column ?y) (value 0)))
+    )
+
+    (defrule COMPUTE-NEIGHBORS::count-neighbor-sum
+        ?f <- (neighbor (row ?nx) (column ?ny) (live-cell ?x ?y))
+        ?p <- (neighbor-sum (row ?nx) (column ?ny) (value ?v))
+        =>
+        (retract ?f ?p)
+        (assert (neighbor-sum (row ?nx) (column ?ny) (value (+ ?v 1))))
+    )
+
+
+;; 3. 更新所有細胞
+(defmodule NEXT-GENERATION (import MAIN deftemplate cell)
+                           (import COMPUTE-NEIGHBORS deftemplate neighbor-sum))
+
+    (defrule NEXT-GENERATION::continue-life
+        ?a <- (cell (row ?x) (column ?y) (status *))
+        ?b <- (neighbor-sum (row ?x) (column ?y) (value 2|3))
+        =>
+        (retract ?a ?b)
+        (assert (cell (row ?x) (column ?y) (status *)))
+    )
+
+    (defrule NEXT-GENERATION::die
+        ?a <- (cell (row ?x) (column ?y) (status *))
+        ?b <- (neighbor-sum (row ?x) (column ?y) (value ?v))
+        (test (or (< ?v 2)
+                  (> ?v 3)))
+        =>
+        (retract ?a ?b)
+        (assert (cell (row ?x) (column ?y) (status -)))
+    )
+    
+    (defrule NEXT-GENERATION::resurrection
+        ?a <- (cell (row ?x) (column ?y) (status -))
+        ?b <- (neighbor-sum (row ?x) (column ?y) (value 3))
+        =>
+        (retract ?a ?b)
+        (assert (cell (row ?x) (column ?y) (status *)))
+    )
+
+    (defrule NEXT-GENERATION::continue-die
+        ?a <- (cell (row ?x) (column ?y) (status -))
+        ?b <- (neighbor-sum (row ?x) (column ?y) (value ?v&~3))
+        =>
+        (retract ?a ?b)
+        (assert (cell (row ?x) (column ?y) (status -)))
+    )
+
+    
